@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>CMPUT 404 JS Lab</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+
+    section {
+      border: 2px solid #333;
+      padding: 15px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+    }
+
+    h2 {
+      margin-top: 0;
+    }
+
+    button {
+      margin-right: 5px; /*adds a small gap to the right so all buttons dont run together*/
+    }
+
+    input {
+      margin-right: 10px;
+    }
+    
+    /* When the countdown is finished, the message is shown, until then, display is none */
+    #countdown-finished {
+      display: none;
+      color: red;
+      font-weight: bold;
+    }
+  </style>
+
+  <!-- opens javascript block -->
+  <script>
+    'use strict';
+    
+    /**
+    * It is a model class that allows other classes to register to be notified once a second.
+    */
+    class Ticker {
+      static instance = null;
+      
+      //If someone tries to create a second Ticker, this throws an error immediately and stops them. This enforces the Singleton pattern.      
+      constructor() {
+        if (Ticker.instance !== null) {
+          throw new Error("Use Ticker.getInstance()");
+        }
+        this.observers = [];
+        this.timeoutId = null;
+        Ticker.instance = this;
+      }
+      
+      //If no Ticker exists yet, it creates one. The new Ticker() call triggers the constructor which sets Ticker.instance.
+      static getInstance() {
+        if (Ticker.instance === null) {
+          new Ticker();
+        }
+        return Ticker.instance;
+      }
+      // Follows observer pattern. 
+      // Any object that wants to be updated every second calls this method. It gets pushed into the observers array.
+      addObserver(observer) {
+        this.observers.push(observer);
+      }
+
+      // Follows observer pattern
+      // This loops through every registered observer and calls their update() method.
+      notify() {
+        for (const observer of this.observers) {
+          if (typeof observer.update === "function") {
+            observer.update();
+          }
+        }
+      }
+
+      // It is called from main. It only starts scheduling if no timeout is already running
+      start() {
+        if (this.timeoutId === null) {
+          this.schedule();
+        }
+      }
+
+      // This is to call settimeout. It schedules a function to run after 1 second 
+      schedule() {
+        this.timeoutId = setTimeout(() => {
+          this.notify();
+          this.timeoutId = null;
+          this.schedule();
+        }, 1000);
+      }
+    }
+
+
+    class Clock {
+      constructor(id) {
+        this.element = document.getElementById(id);
+      }
+
+      update() {
+        const now = new Date();
+
+        // padStart(2, "0") ensures single digits get a leading zero
+        const hours = String(now.getHours()).padStart(2, "0");
+        const minutes = String(now.getMinutes()).padStart(2, "0");
+        const seconds = String(now.getSeconds()).padStart(2, "0");
+
+        this.element.textContent = `${hours}:${minutes}:${seconds}`;
+      }
+    }
+
+
+    class Timer {
+      constructor() {
+        this.minutesInput = document.getElementById("minutes-input");
+        this.secondsInput = document.getElementById("seconds-input");
+        this.toggle = document.getElementById("timer-toggle");
+        this.display = document.getElementById("timer-display");
+
+        this.remainingSeconds = 0;
+
+        // It attaches an event listener to the checkbox. 
+        // When the checkbox changes state, if it's now checked, start the timer; if it's unchecked, stop the timer.
+        this.toggle.addEventListener("change", () => {
+          if (this.toggle.checked) {
+            this.start();
+          } else {
+            this.stop();
+          }
+        });
+      }
+
+      // reads the values from the inputs and convert to integers.
+      // if empty, default to 0
+      start() {
+        const minutes = parseInt(this.minutesInput.value) || 0;
+        const seconds = parseInt(this.secondsInput.value) || 0;
+
+        this.remainingSeconds = minutes * 60 + seconds;
+       
+        // Disables both inputs while the timer runs so the user can't change the time mid-countdown.
+        this.minutesInput.disabled = true;
+        this.secondsInput.disabled = true;
+      }
+
+      stop() {
+        this.minutesInput.disabled = false;
+        this.secondsInput.disabled = false;
+        this.display.textContent = "Timer stopped";
+      }
+
+      update() {
+        if (!this.toggle.checked) return;
+
+        if (this.remainingSeconds > 0) {
+          this.remainingSeconds--;
+
+          const mins = Math.floor(this.remainingSeconds / 60);
+          const secs = this.remainingSeconds % 60;
+
+          this.display.textContent =
+            `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+        } else {
+          this.display.textContent = "Time's Up!";
+          this.toggle.checked = false;
+          this.stop();
+        }
+      }
+    }
+
+
+    class Stopwatch {
+      constructor() {
+        this.startBtn = document.getElementById("start-btn");
+        this.stopBtn = document.getElementById("stop-btn");
+        this.resetBtn = document.getElementById("reset-btn");
+        this.display = document.getElementById("stopwatch-display");
+
+        this.running = false;
+        this.elapsedMilliseconds = 0;
+
+        this.startBtn.addEventListener("click", () => this.start());
+        this.stopBtn.addEventListener("click", () => this.stop());
+        this.resetBtn.addEventListener("click", () => this.reset());
+      }
+
+      start() {
+        this.running = true;
+        this.startBtn.disabled = true;
+        this.stopBtn.disabled = false;
+      }
+
+      stop() {
+        this.running = false;
+        this.startBtn.disabled = false;
+        this.stopBtn.disabled = true;
+      }
+
+      reset() {
+        this.running = false;
+        this.elapsedMilliseconds = 0;
+        this.updateDisplay();
+
+        this.startBtn.disabled = false;
+        this.stopBtn.disabled = true;
+      }
+
+      update() {
+        if (!this.running) return;
+
+        this.elapsedMilliseconds += 1000;
+        this.updateDisplay();
+      }
+
+      updateDisplay() {
+        const totalSeconds = Math.floor(this.elapsedMilliseconds / 1000);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        const milliseconds = this.elapsedMilliseconds % 1000;
+
+        this.display.textContent =
+          `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${String(milliseconds).padStart(3, "0")}`;
+      }
+    }
+
+
+    class Countdown {
+      constructor() {
+        this.input = document.getElementById("countdown-input");
+        this.display = document.getElementById("countdown-display");
+        this.finished = document.getElementById("countdown-finished");
+
+        this.targetDate = null;
+
+        this.input.addEventListener("change", () => {
+          if (this.input.value) {
+            this.targetDate = new Date(this.input.value);
+          }
+        });
+      }
+
+      update() {
+        if (!this.targetDate) return;
+
+        const now = new Date();
+        let diff = this.targetDate - now;
+        const isPast = diff < 0;
+
+        diff = Math.abs(diff);
+
+        const totalSeconds = Math.floor(diff / 1000);
+
+        const years = Math.floor(totalSeconds / (365 * 24 * 60 * 60));
+        const months = Math.floor((totalSeconds % (365 * 24 * 60 * 60)) / (30 * 24 * 60 * 60));
+        const days = Math.floor((totalSeconds % (30 * 24 * 60 * 60)) / (24 * 60 * 60));
+        const hours = Math.floor((totalSeconds % (24 * 60 * 60)) / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+
+        if (!isPast) {
+          this.display.textContent =
+            `${years} years ${months} months ${days} days ` +
+            `${hours} hours ${minutes} minutes ${seconds} seconds remaining`;
+
+          this.finished.style.display = "none";
+        } else {
+          this.display.textContent =
+            `${years} years ${months} months ${days} days ` +
+            `${hours} hours ${minutes} minutes ${seconds} seconds ago`;
+
+          this.finished.style.display = "block";
+        }
+      }
+    }
+
+
+    function main() {
+      const ticker = Ticker.getInstance();
+
+      ticker.addObserver(new Clock("clock-display"));
+      ticker.addObserver(new Timer());
+      ticker.addObserver(new Stopwatch());
+      ticker.addObserver(new Countdown());
+
+      ticker.start();
+    }
+
+    window.addEventListener("load", main);
+
+  </script>
+</head>
+
+<body>
+
+  <section>
+    <h2>Clock</h2>
+    <p id="clock-display">--:--:--</p>
+  </section>
+
+  <section>
+    <h2>Timer</h2>
+
+    <label for="minutes-input">Minutes:</label>
+    <input type="number" id="minutes-input" min="0" value="0">
+
+    <label for="seconds-input">Seconds:</label>
+    <input type="number" id="seconds-input" min="0" max="59" value="0">
+
+    <label for="timer-toggle">Run Timer:</label>
+    <input type="checkbox" id="timer-toggle">
+
+    <p id="timer-display">Timer stopped</p>
+  </section>
+
+  <section>
+    <h2>Stopwatch</h2>
+
+    <button id="start-btn">Start</button>
+    <button id="stop-btn" disabled>Stop</button>
+    <button id="reset-btn">Reset</button>
+
+    <p id="stopwatch-display">0:00:00.000</p>
+  </section>
+
+  <section>
+    <h2>Countdown</h2>
+
+    <label for="countdown-input">Select Date & Time:</label>
+    <input type="datetime-local" id="countdown-input">
+
+    <p id="countdown-display">No countdown set</p>
+
+    <p id="countdown-finished">
+      Countdown reached!
+    </p>
+  </section>
+
+</body>
+
+</html>
